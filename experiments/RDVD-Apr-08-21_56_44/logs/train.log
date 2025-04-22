@@ -1,0 +1,17 @@
+[2025-04-08 21:56:44] COMMAND: C:\mac\python\RDVD\train_udvd.py
+[2025-04-08 21:56:44] Arguments: {'data_path': 'datasets/noisy_0_crop', 'noisy_path': 'datasets/noisy_1000_crop', 'aug': 0, 'batch_size': 2, 'image_size': 128, 'n_frames': 5, 'stride': 64, 'loss': 'loglike', 'lr': 0.0001, 'num_epochs': 1024, 'valid_interval': 1, 'save_interval': 1, 'seed': 0, 'output_dir': 'experiments', 'experiment': 'RDVD-Apr-08-21_56_44', 'resume_training': False, 'restore_file': None, 'no_save': False, 'step_checkpoints': False, 'no_log': False, 'log_interval': 100, 'no_visual': False, 'visual_interval': 100, 'no_progress': False, 'draft': False, 'dry_run': False, 'channels': 3, 'out_channels': 9, 'bias': False, 'normal': False, 'blind_noise': True, 'experiment_dir': 'experiments\\RDVD-Apr-08-21_56_44', 'checkpoint_dir': 'experiments\\RDVD-Apr-08-21_56_44\\checkpoints', 'log_dir': 'experiments\\RDVD-Apr-08-21_56_44\\logs', 'log_file': 'experiments\\RDVD-Apr-08-21_56_44\\logs\\train.log'}
+[2025-04-08 21:56:44] Built a model consisting of 3,002,688 parameters
+[2025-04-08 21:57:47] epoch 00 | train_loss 135.578 | train_psnr 16.455 | train_ssim 0.000 | mean_psnr 9.525 | mean_ssim 0.000 | lr 1.0e-04 | 200 mini-batches ended
+[2025-04-08 21:58:01] epoch 00 | train_loss 53.068 | train_psnr 16.587 | train_ssim 0.000 | mean_psnr 9.716 | mean_ssim 0.000 | lr 1.0e-04
+[2025-04-08 22:05:31] EVAL:epoch 00 | valid_loss 22.231 | valid_psnr 15.792 | valid_ssim 0.000 | mean_psnr 8.787 | mean_ssim 0.000 | lr 1.0e-04
+[2025-04-08 22:06:34] epoch 01 | train_loss -2.077 | train_psnr 16.581 | train_ssim 0.000 | mean_psnr 11.673 | mean_ssim 0.000 | lr 1.0e-04 | 200 mini-batches ended
+[2025-04-08 22:06:48] epoch 01 | train_loss -2.604 | train_psnr 16.588 | train_ssim 0.000 | mean_psnr 11.832 | mean_ssim 0.000 | lr 1.0e-04
+[2025-04-08 22:14:16] EVAL:epoch 01 | valid_loss -3.837 | valid_psnr 15.963 | valid_ssim 0.000 | mean_psnr 10.626 | mean_ssim 0.000 | lr 1.0e-04
+[2025-04-08 22:15:20] epoch 02 | train_loss -2.899 | train_psnr 16.689 | train_ssim 0.000 | mean_psnr 12.196 | mean_ssim 0.000 | lr 1.0e-04 | 200 mini-batches ended
+[2025-04-08 22:15:34] epoch 02 | train_loss -2.819 | train_psnr 16.570 | train_ssim 0.000 | mean_psnr 12.198 | mean_ssim 0.000 | lr 1.0e-04
+[2025-04-08 22:23:02] EVAL:epoch 02 | valid_loss -3.898 | valid_psnr 15.929 | valid_ssim 0.000 | mean_psnr 12.336 | mean_ssim 0.000 | lr 1.0e-04
+[2025-04-08 22:24:06] epoch 03 | train_loss -3.039 | train_psnr 16.808 | train_ssim 0.000 | mean_psnr 13.293 | mean_ssim 0.000 | lr 1.0e-04 | 200 mini-batches ended
+[2025-04-08 22:24:20] epoch 03 | train_loss -3.046 | train_psnr 16.990 | train_ssim 0.000 | mean_psnr 13.499 | mean_ssim 0.000 | lr 1.0e-04
+[2025-04-08 22:31:49] EVAL:epoch 03 | valid_loss -4.175 | valid_psnr 16.144 | valid_ssim 0.000 | mean_psnr 13.693 | mean_ssim 0.000 | lr 1.0e-04
+[2025-04-08 22:32:53] epoch 04 | train_loss -3.093 | train_psnr 17.022 | train_ssim 0.000 | mean_psnr 14.289 | mean_ssim 0.000 | lr 1.0e-04 | 200 mini-batches ended
+[2025-04-08 22:33:07] epoch 04 | train_loss -3.118 | train_psnr 16.973 | train_ssim 0.000 | mean_psnr 14.330 | mean_ssim 0.000 | lr 1.0e-04
