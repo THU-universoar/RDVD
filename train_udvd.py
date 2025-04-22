@@ -153,11 +153,12 @@ def main(args):
                         noisy_inputs = noisy_inputs.to(device)
                         outputs, est_sigma = model(noisy_inputs)
                         noisy_frame = noisy_inputs[:, (mid*cpf):((mid+1)*cpf), :, :]
+                        truth_frame = sample[:, (mid*cpf):((mid+1)*cpf), :, :]
 
                         if args.blind_noise:
-                            loss = utils.loss_function(outputs, noisy_frame, mode=args.loss, sigma=est_sigma, device=device)
+                            loss = utils.loss_function(outputs, truth_frame, mode=args.loss, sigma=est_sigma, device=device)
                         else:
-                            loss = utils.loss_function(outputs, noisy_frame, mode=args.loss, sigma=args.noise_std/255, device=device)
+                            loss = utils.loss_function(outputs, truth_frame, mode=args.loss, sigma=args.noise_std/255, device=device)
 
                         if args.loss == "loglike":
                             if args.blind_noise:
@@ -225,9 +226,9 @@ def main(args):
                     ######
 
                     if args.blind_noise:
-                        loss = utils.loss_function(outputs, noisy_frame, mode=args.loss, sigma=est_sigma, device=device)
+                        loss = utils.loss_function(outputs, truth_frame, mode=args.loss, sigma=est_sigma, device=device)
                     else:
-                        loss = utils.loss_function(outputs, noisy_frame, mode=args.loss, sigma=args.noise_std/255, device=device)
+                        loss = utils.loss_function(outputs, truth_frame, mode=args.loss, sigma=args.noise_std/255, device=device)
 
                     if args.loss == "loglike":
                         if args.blind_noise:
@@ -314,7 +315,7 @@ def get_args():
     parser.add_argument("--visual-interval", type=int, default=100, help="log every N steps")
     parser.add_argument("--no-progress", action="store_true", help="don't use progress bar")
     parser.add_argument("--draft", action="store_true", help="save experiment results to draft directory")
-    parser.add_argument("--dry-run", action="store_false", help="no log, no save, no visualization")
+    parser.add_argument("--dry-run", action="store_true", help="no log, no save, no visualization")
 
     # Parse twice as model arguments are not known the first time
     BlindVideoNet.add_args(parser)
