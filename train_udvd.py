@@ -291,7 +291,7 @@ def get_args():
     # Add optimization arguments
     parser.add_argument("--lr", default=1e-4, type=float, help="learning rate")
     parser.add_argument("--num-epochs", default=1024, type=int, help="force stop training at specified epoch")
-    parser.add_argument("--valid-interval", default=1, type=int, help="evaluate every N epochs")
+    parser.add_argument("--valid-interval", default=10, type=int, help="evaluate every N epochs")
     parser.add_argument("--save-interval", default=1, type=int, help="save a checkpoint every N steps")
 
     #add_logging_arguments
