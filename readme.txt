@@ -1,1 +1,1 @@
-tensorboard --logdir=simulate/深度学习方法/runs --port=6006
+tensorboard --logdir=experiments --port=6006
