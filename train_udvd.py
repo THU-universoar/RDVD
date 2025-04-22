@@ -218,13 +218,6 @@ def main(args):
                     noisy_frame = noisy_inputs[:, (mid*cpf):((mid+1)*cpf), :, :]
                     truth_frame = sample[:, (mid*cpf):((mid+1)*cpf), :, :]
 
-                    ######
-                    output_dir_img = os.path.join(output_dir_epoch, f"output_1_{sample_id}.png")
-                    transform_img = transforms.ToPILImage()
-                    img_save = np.array(transform_img(outputs[0].cpu().detach()))
-                    plt.imsave(output_dir_img, img_save)
-                    ######
-
                     if args.blind_noise:
                         loss = utils.loss_function(outputs, truth_frame, mode=args.loss, sigma=est_sigma, device=device)
                     else:
@@ -246,7 +239,7 @@ def main(args):
                         mean_meters["mean_psnr"].update(mean_psnr.item())
 
                     ######
-                    output_dir_img = os.path.join(output_dir_epoch, f"output_2_{sample_id}.png")
+                    output_dir_img = os.path.join(output_dir_epoch, f"output_{sample_id}.png")
                     transform_img = transforms.ToPILImage()
                     img_save = np.array(transform_img(outputs[0].cpu().detach()))
                     plt.imsave(output_dir_img, img_save)
@@ -298,7 +291,7 @@ def get_args():
     # Add optimization arguments
     parser.add_argument("--lr", default=1e-4, type=float, help="learning rate")
     parser.add_argument("--num-epochs", default=1024, type=int, help="force stop training at specified epoch")
-    parser.add_argument("--valid-interval", default=10, type=int, help="evaluate every N epochs")
+    parser.add_argument("--valid-interval", default=1, type=int, help="evaluate every N epochs")
     parser.add_argument("--save-interval", default=1, type=int, help="save a checkpoint every N steps")
 
     #add_logging_arguments
