@@ -22,11 +22,12 @@ def main(args):
     utils.init_logging(args)
 
     # Build data loaders, a model and an optimizer
-    model = BlindVideoNet(channels_per_frame=args.channels, out_channels=args.out_channels, bias=args.bias, blind=(not args.normal), sigma_known=(not args.blind_noise)).to(device)
+    model = BlindVideoNet(channels_per_frame=args.channels, out_channels=args.out_channels, bias=args.bias).to(device)
+    criterion = nn.MSELoss(reduction='sum')
+    criterion.to(device)
     cpf = model.c # channels per frame
     mid = args.n_frames // 2
     model = nn.DataParallel(model)
-    # print(model)
     optimizer = torch.optim.Adam(model.parameters(), lr=args.lr)
     scheduler = torch.optim.lr_scheduler.MultiStepLR(optimizer, milestones=[1000], gamma=0.5)
     logging.info(f"Built a model consisting of {sum(p.numel() for p in model.parameters()):,} parameters")
@@ -42,10 +43,8 @@ def main(args):
     train_loader, valid_loader = load_SingleVideo(args.data_path, noisy_path=args.noisy_path, batch_size=args.batch_size, image_size=args.image_size, stride=args.stride, n_frames=args.n_frames, aug=args.aug)
 
     # Track moving average of loss values
-    train_meters = {name: utils.RunningAverageMeter(0.98) for name in (["train_loss", "train_psnr", "train_ssim"])}
-    if args.loss == "loglike":
-        mean_meters = {name: utils.AverageMeter() for name in (["mean_psnr", "mean_ssim"])}
-    valid_meters = {name: utils.AverageMeter() for name in (["valid_loss", "valid_psnr", "valid_ssim"])}
+    train_meters = {name: utils.RunningAverageMeter(0.98) for name in (["train_loss", "train_psnr"])}
+    valid_meters = {name: utils.AverageMeter() for name in (["valid_loss", "valid_psnr"])}
     writer = SummaryWriter(log_dir=args.experiment_dir) if not args.no_visual else None
 
 ########训练
@@ -58,9 +57,6 @@ def main(args):
         train_bar = utils.ProgressBar(train_loader, epoch)
         for meter in train_meters.values():
             meter.reset()
-        if args.loss == "loglike":
-            for meter in mean_meters.values():
-                meter.reset()
 
         for batch_id, (inputs, noisy_inputs) in enumerate(train_bar):
 
@@ -69,40 +65,23 @@ def main(args):
             inputs = inputs.to(device)
             noisy_inputs = noisy_inputs.to(device)
             
-            outputs, est_sigma = model(noisy_inputs)
+            outputs = model(noisy_inputs)
             noisy_frame = noisy_inputs[:, (mid*cpf):((mid+1)*cpf), :, :]
             truth_frame = inputs[:, (mid*cpf):((mid+1)*cpf), :, :]
 
-            if args.blind_noise:
-                loss = utils.loss_function(outputs, truth_frame, mode=args.loss, sigma=est_sigma, device=device)
-            else:
-                loss = utils.loss_function(outputs, truth_frame, mode=args.loss, sigma=args.noise_std/255, device=device)
-
+            loss = criterion(outputs, truth_frame)
             model.zero_grad()
             loss.backward()
             optimizer.step()
-
-            if args.loss == "loglike":
-                with torch.no_grad():
-                    if args.blind_noise:
-                        outputs, mean_image = utils.post_process(outputs, noisy_frame, sigma=est_sigma, device=device)
-                    else:
-                        outputs, mean_image = utils.post_process(outputs, noisy_frame, sigma=args.noise_std/255, device=device)
 
             train_psnr = utils.psnr(inputs[:, (mid*cpf):((mid+1)*cpf), :, :], outputs, normalized=True, raw=False)
             train_meters["train_loss"].update(loss.item())
             train_meters["train_psnr"].update(train_psnr.item())
 
-            if args.loss == "loglike":
-                mean_psnr = utils.psnr(inputs[:, (mid*cpf):((mid+1)*cpf), :, :], mean_image, normalized=True, raw=False)
-                mean_meters["mean_psnr"].update(mean_psnr.item())
-
             if writer is not None and global_step % args.log_interval == 0:
                 writer.add_scalar("lr", optimizer.param_groups[0]["lr"], global_step)
                 writer.add_scalar("loss/train", loss.item(), global_step)
                 writer.add_scalar("psnr/train", train_psnr.item(), global_step)
-                if args.loss == "loglike":
-                    writer.add_scalar("psnr/mean", mean_psnr.item(), global_step)
                 gradients = torch.cat([p.grad.view(-1) for p in model.parameters() if p.grad is not None], dim=0)
                 writer.add_histogram("gradients", gradients, global_step)
                 sys.stdout.flush()
@@ -122,17 +101,11 @@ def main(args):
                 plt.imsave(figure_dir_outputs, outputs_save)
                 plt.imsave(figure_dir_clean, clean_save)
 
-                if args.loss == "loglike":
-                    logging.info(train_bar.print(dict(**train_meters, **mean_meters, lr=optimizer.param_groups[0]["lr"]))+f" | {batch_id+1} mini-batches ended")
-                else:
-                    logging.info(train_bar.print(dict(**train_meters, lr=optimizer.param_groups[0]["lr"]))+f" | {batch_id+1} mini-batches ended")
+                logging.info(train_bar.print(dict(**train_meters, lr=optimizer.param_groups[0]["lr"]))+f" | {batch_id+1} mini-batches ended")
             if (batch_id+1) % 2000 == 0:
                 model.eval()
                 for meter in valid_meters.values():
                     meter.reset()
-                if args.loss == "loglike":
-                    for meter in mean_meters.values():
-                        meter.reset()
 
                 valid_bar = utils.ProgressBar(valid_loader)
                 running_valid_psnr = 0.0
@@ -142,29 +115,15 @@ def main(args):
                     with torch.no_grad():
                         sample = sample.to(device)
                         noisy_inputs = noisy_inputs.to(device)
-                        outputs, est_sigma = model(noisy_inputs)
+                        outputs = model(noisy_inputs)
                         noisy_frame = noisy_inputs[:, (mid*cpf):((mid+1)*cpf), :, :]
                         truth_frame = sample[:, (mid*cpf):((mid+1)*cpf), :, :]
-
-                        if args.blind_noise:
-                            loss = utils.loss_function(outputs, truth_frame, mode=args.loss, sigma=est_sigma, device=device)
-                        else:
-                            loss = utils.loss_function(outputs, truth_frame, mode=args.loss, sigma=args.noise_std/255, device=device)
-
-                        if args.loss == "loglike":
-                            if args.blind_noise:
-                                outputs, mean_image = utils.post_process(outputs, noisy_frame, sigma=est_sigma, device=device)
-                            else:
-                                outputs, mean_image = utils.post_process(outputs, noisy_frame, sigma=args.noise_std/255, device=device)
+                        loss = criterion(outputs, truth_frame)
 
                         valid_psnr = utils.psnr(sample[:, (mid*cpf):((mid+1)*cpf), :, :], outputs, normalized=True, raw=False)
                         running_valid_psnr += valid_psnr
                         valid_meters["valid_loss"].update(loss.item())
                         valid_meters["valid_psnr"].update(valid_psnr.item())
-
-                        if args.loss == "loglike":
-                            mean_psnr = utils.psnr(sample[:, (mid*cpf):((mid+1)*cpf), :, :], mean_image, normalized=True, raw=False)
-                            mean_meters["mean_psnr"].update(mean_psnr.item())
 
                 running_valid_psnr /= (sample_id+1)
 
@@ -172,17 +131,11 @@ def main(args):
                     writer.add_scalar("psnr/valid", valid_meters['valid_psnr'].avg, global_step)
                     sys.stdout.flush()
 
-                if args.loss == "loglike":
-                    logging.info("EVAL:"+train_bar.print(dict(**valid_meters, **mean_meters, lr=optimizer.param_groups[0]["lr"])))
-                else:
-                    logging.info("EVAL:"+train_bar.print(dict(**valid_meters, lr=optimizer.param_groups[0]["lr"])))
+                logging.info("EVAL:"+train_bar.print(dict(**valid_meters, lr=optimizer.param_groups[0]["lr"])))
                 utils.save_checkpoint(args, global_step, model, optimizer, score=valid_meters["valid_loss"].avg, mode="min")
         scheduler.step()
 
-        if args.loss == "loglike":
-            logging.info(train_bar.print(dict(**train_meters, **mean_meters, lr=optimizer.param_groups[0]["lr"])))
-        else:
-            logging.info(train_bar.print(dict(**train_meters, lr=optimizer.param_groups[0]["lr"])))
+        logging.info(train_bar.print(dict(**train_meters, lr=optimizer.param_groups[0]["lr"])))
 ########验证
         if (epoch+1) % args.valid_interval == 0:
 
@@ -194,9 +147,6 @@ def main(args):
             model.eval()
             for meter in valid_meters.values():
                 meter.reset()
-            if args.loss == "loglike":
-                for meter in mean_meters.values():
-                    meter.reset()
 
             valid_bar = utils.ProgressBar(valid_loader)
             running_valid_psnr = 0.0
@@ -205,29 +155,16 @@ def main(args):
                 with (torch.no_grad()):
                     sample = sample.to(device)
                     noisy_inputs = noisy_inputs.to(device)
-                    outputs, est_sigma = model(noisy_inputs)
+                    outputs = model(noisy_inputs)
                     noisy_frame = noisy_inputs[:, (mid*cpf):((mid+1)*cpf), :, :]
                     truth_frame = sample[:, (mid*cpf):((mid+1)*cpf), :, :]
 
-                    if args.blind_noise:
-                        loss = utils.loss_function(outputs, truth_frame, mode=args.loss, sigma=est_sigma, device=device)
-                    else:
-                        loss = utils.loss_function(outputs, truth_frame, mode=args.loss, sigma=args.noise_std/255, device=device)
-
-                    if args.loss == "loglike":
-                        if args.blind_noise:
-                            outputs, mean_image = utils.post_process(outputs, noisy_frame, sigma=est_sigma, device=device)
-                        else:
-                            outputs, mean_image = utils.post_process(outputs, noisy_frame, sigma=args.noise_std/255, device=device)
+                    loss = criterion(outputs, truth_frame)
 
                     valid_psnr = utils.psnr(sample[:, (mid*cpf):((mid+1)*cpf), :, :], outputs, normalized=True, raw=False)
                     running_valid_psnr += valid_psnr
                     valid_meters["valid_loss"].update(loss.item())
                     valid_meters["valid_psnr"].update(valid_psnr.item())
-
-                    if args.loss == "loglike":
-                        mean_psnr = utils.psnr(sample[:, (mid*cpf):((mid+1)*cpf), :, :], mean_image, normalized=True, raw=False)
-                        mean_meters["mean_psnr"].update(mean_psnr.item())
 
                     ######
                     output_dir_img = os.path.join(output_dir_epoch, f"output_{sample_id}.png")
@@ -255,10 +192,8 @@ def main(args):
                 writer.add_scalar("psnr/valid", valid_meters['valid_psnr'].avg, global_step)
                 sys.stdout.flush()
 
-            if args.loss == "loglike":
-                logging.info("EVAL:"+train_bar.print(dict(**valid_meters, **mean_meters, lr=optimizer.param_groups[0]["lr"])))
-            else:
-                logging.info("EVAL:"+train_bar.print(dict(**valid_meters, lr=optimizer.param_groups[0]["lr"])))
+
+            logging.info("EVAL:"+train_bar.print(dict(**valid_meters, lr=optimizer.param_groups[0]["lr"])))
             utils.save_checkpoint(args, global_step, model, optimizer, score=valid_meters["valid_loss"].avg, mode="min")
 
 
@@ -276,8 +211,6 @@ def get_args():
     parser.add_argument("--image-size", default=128, type=int, help="image size for train")
     parser.add_argument("--n-frames", default=5, type=int, help="number of frames for training")
     parser.add_argument("--stride", default=64, type=int, help="stride for patch extraction")
-    # Add loss function
-    parser.add_argument("--loss", default="loglike", help="loss function used for training")
 
     # Add optimization arguments
     parser.add_argument("--lr", default=1e-4, type=float, help="learning rate")

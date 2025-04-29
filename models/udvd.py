@@ -24,37 +24,30 @@ class shift(nn.Module):
         return x
 
 class Conv(nn.Module):
-    def __init__(self, in_channels, out_channels, bias=False, blind=True):
+    def __init__(self, in_channels, out_channels, bias=False):
         super().__init__()
-        self.blind = blind
-        if blind:
-            self.shift_down = nn.ZeroPad2d((0,0,1,0))
-            self.crop = crop()
+        self.shift_down = nn.ZeroPad2d((0,0,1,0))
+        self.crop = crop()
         self.replicate = nn.ReplicationPad2d(1)
         self.conv = nn.Conv2d(in_channels, out_channels, 3, bias=bias)
         self.relu = nn.LeakyReLU(0.1, inplace=True)
 
     def forward(self, x):
-        if self.blind:
-            x = self.shift_down(x)
+        x = self.shift_down(x)
         x = self.replicate(x)
         x = self.conv(x)
         x = self.relu(x)
-        if self.blind:
-            x = self.crop(x)
+        x = self.crop(x)
         return x
 
 class Pool(nn.Module):
-    def __init__(self, blind=True):
+    def __init__(self):
         super().__init__()
-        self.blind = blind
-        if blind:
-            self.shift = shift()
+        self.shift = shift()
         self.pool = nn.MaxPool2d(2)
 
     def forward(self, x):
-        if self.blind:
-            x = self.shift(x)
+        x = self.shift(x)
         x = self.pool(x)
         return x
 
@@ -82,14 +75,14 @@ class unrotate(nn.Module):
         return x
 
 class ENC_Conv(nn.Module):
-    def __init__(self, in_channels, mid_channels, out_channels, bias=False, reduce=True, blind=True):
+    def __init__(self, in_channels, mid_channels, out_channels, bias=False, reduce=True):
         super().__init__()
         self.reduce = reduce
-        self.conv1 = Conv(in_channels, mid_channels, bias=bias, blind=blind)
-        self.conv2 = Conv(mid_channels, mid_channels, bias=bias, blind=blind)
-        self.conv3 = Conv(mid_channels, out_channels, bias=bias, blind=blind)
+        self.conv1 = Conv(in_channels, mid_channels, bias=bias)
+        self.conv2 = Conv(mid_channels, mid_channels, bias=bias)
+        self.conv3 = Conv(mid_channels, out_channels, bias=bias)
         if reduce:
-            self.pool = Pool(blind=blind)
+            self.pool = Pool()
 
     def forward(self, x):
         x = self.conv1(x)
@@ -100,13 +93,13 @@ class ENC_Conv(nn.Module):
         return x
 
 class DEC_Conv(nn.Module):
-    def __init__(self, in_channels, mid_channels, out_channels, bias=False, blind=True):
+    def __init__(self, in_channels, mid_channels, out_channels, bias=False):
         super().__init__()
         self.upsample = nn.Upsample(scale_factor=2, mode='nearest')
-        self.conv1 = Conv(in_channels, mid_channels, bias=bias, blind=blind)
-        self.conv2 = Conv(mid_channels, mid_channels, bias=bias, blind=blind)
-        self.conv3 = Conv(mid_channels, mid_channels, bias=bias, blind=blind)
-        self.conv4 = Conv(mid_channels, out_channels, bias=bias, blind=blind)
+        self.conv1 = Conv(in_channels, mid_channels, bias=bias)
+        self.conv2 = Conv(mid_channels, mid_channels, bias=bias)
+        self.conv3 = Conv(mid_channels, mid_channels, bias=bias)
+        self.conv4 = Conv(mid_channels, out_channels, bias=bias)
 
     def forward(self, x, x_in):
         x = self.upsample(x)
@@ -125,15 +118,15 @@ class DEC_Conv(nn.Module):
         return x
 
 class Blind_UNet(nn.Module):
-    def __init__(self, n_channels=3, n_output=96, bias=False, blind=True):
+    def __init__(self, n_channels=3, n_output=96, bias=False):
         super().__init__()
         self.n_channels = n_channels
         self.bias = bias
-        self.enc1 = ENC_Conv(n_channels, 48, 48, bias=bias, blind=blind)
-        self.enc2 = ENC_Conv(48, 48, 48, bias=bias, blind=blind)
-        self.enc3 = ENC_Conv(48, 96, 48, bias=bias, reduce=False, blind=blind)
-        self.dec2 = DEC_Conv(96, 96, 96, bias=bias, blind=blind)
-        self.dec1 = DEC_Conv(96+n_channels, 96, n_output, bias=bias, blind=blind)
+        self.enc1 = ENC_Conv(n_channels, 48, 48, bias=bias)
+        self.enc2 = ENC_Conv(48, 48, 48, bias=bias)
+        self.enc3 = ENC_Conv(48, 96, 48, bias=bias, reduce=False)
+        self.dec2 = DEC_Conv(96, 96, 96, bias=bias)
+        self.dec1 = DEC_Conv(96+n_channels, 96, n_output, bias=bias)
 
     def forward(self, input):
         x1 = self.enc1(input)
@@ -145,19 +138,14 @@ class Blind_UNet(nn.Module):
 
 
 class BlindVideoNet(nn.Module):
-    def __init__(self, channels_per_frame=3, out_channels=9, bias=False, blind=True, sigma_known=True):
+    def __init__(self, channels_per_frame=3, out_channels=3, bias=False):
         super().__init__()
         self.c = channels_per_frame
         self.out_channels = out_channels
-        self.blind = blind
-        self.sigma_known = sigma_known
         self.rotate = rotate()
-        self.denoiser_1 = Blind_UNet(n_channels=3*channels_per_frame, n_output=32, bias=bias, blind=blind)
-        self.denoiser_2 = Blind_UNet(n_channels=96, n_output=96, bias=bias, blind=blind)
-        if not sigma_known:
-            self.sigma_net = Blind_UNet(n_channels=5*channels_per_frame, n_output=1, bias=False, blind=False)
-        if blind:
-            self.shift = shift()
+        self.denoiser_1 = Blind_UNet(n_channels=3*channels_per_frame, n_output=32, bias=bias)
+        self.denoiser_2 = Blind_UNet(n_channels=96, n_output=96, bias=bias)
+        self.shift = shift()
         self.unrotate = unrotate()
         self.nin_A = nn.Conv2d(384, 384, 1, bias=bias)
         self.nin_B = nn.Conv2d(384, 96, 1, bias=bias)
@@ -166,18 +154,13 @@ class BlindVideoNet(nn.Module):
     @staticmethod
     def add_args(parser):
         parser.add_argument("--channels", type=int, default=3, help="number of channels per frame")
-        parser.add_argument("--out-channels", type=int, default=9, help="number of output channels")
+        parser.add_argument("--out-channels", type=int, default=3, help="number of output channels")
         parser.add_argument("--bias", action='store_true', help="use residual bias")
         parser.add_argument("--normal", action='store_true', help="not a blind network")
-        parser.add_argument("--blind-noise", action='store_false', help="noise sigma is not known")
 
     def forward(self, x):
         # Square
         N, C, H, W = x.shape
-        if not self.sigma_known:
-            sigma = self.sigma_net(x).mean(dim=(1,2,3))
-        else:
-            sigma = None
 
         if(H > W):
             diff = H - W
@@ -197,8 +180,7 @@ class BlindVideoNet(nn.Module):
         y = torch.cat((y1, y2, y3), dim=1)
         x = self.denoiser_2(y)
 
-        if self.blind:
-            x = self.shift(x)
+        x = self.shift(x)
         x = self.unrotate(x)
         x = F.leaky_relu_(self.nin_A(x), negative_slope=0.1)
         x = F.leaky_relu_(self.nin_B(x), negative_slope=0.1)
@@ -211,4 +193,4 @@ class BlindVideoNet(nn.Module):
         elif(W > H):
             diff = W - H
             x = x[:, :, (diff // 2):(diff // 2 + H), 0:W]
-        return x, sigma
+        return x
