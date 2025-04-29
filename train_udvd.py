@@ -64,15 +64,6 @@ def main(args):
 
         for batch_id, (inputs, noisy_inputs) in enumerate(train_bar):
 
-            # img_show = noisy_inputs[0, 6:9, :, :].permute(1, 2, 0).cpu().numpy()
-            # plt.imshow(img_show)
-            # plt.axis('off')
-            # plt.show()
-            # img_show = inputs[0, 6:9, :, :].permute(1, 2, 0).cpu().numpy()
-            # plt.imshow(img_show)
-            # plt.axis('off')
-            # plt.show()
-
             model.train()
             global_step += 1
             inputs = inputs.to(device)
