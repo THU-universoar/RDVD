@@ -116,7 +116,7 @@ def get_args():
     parser.add_argument("--draft", action="store_true", help="save experiment results to draft directory")
     parser.add_argument("--dry-run", action="store_true", help="no log, no save, no visualization")
 
-    parser.add_argument("--restore-file", default=None, help="filename to load checkpoint")
+    parser.add_argument("--restore-file", default='experiments/RDVD-Apr-29-13_52_29/checkpoints', help="filename to load checkpoint")
 
     # Parse twice as model arguments are not known the first time
     BlindVideoNet.add_args(parser)

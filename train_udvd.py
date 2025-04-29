@@ -116,7 +116,6 @@ def main(args):
                         sample = sample.to(device)
                         noisy_inputs = noisy_inputs.to(device)
                         outputs = model(noisy_inputs)
-                        noisy_frame = noisy_inputs[:, (mid*cpf):((mid+1)*cpf), :, :]
                         truth_frame = sample[:, (mid*cpf):((mid+1)*cpf), :, :]
                         loss = criterion(outputs, truth_frame)
 
